@@ -4,7 +4,6 @@ import sys
 from sqlalchemy import Column, create_engine, Enum as EnumCol, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
-from sqlalchemy.sql.expression import null
 
 
 Base = declarative_base()
