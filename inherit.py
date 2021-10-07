@@ -4,6 +4,7 @@ import sys
 from sqlalchemy import Column, create_engine, Enum as EnumCol, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.sql.expression import null
 
 
 Base = declarative_base()
@@ -13,7 +14,10 @@ session = DBSession()
 
 
 class UserType(Enum):
-  """An Enum to store the 'types' used to differentiate the join"""
+  """An Enum to store the 'types' used to differentiate the join.
+  This just makes it cleaner to reference them later
+  """
+
   User = "user"
   Participant = "participant"
   Host = "host"
@@ -28,11 +32,12 @@ class User(Base):
   __tablename__ = "user"
   id = Column(Integer, primary_key=True)
   username = Column(String(128), nullable=False)
+  # store the type as the value of the enum from above
   type = Column(EnumCol(UserType, length=128, values_callable=lambda ut: [t.value for t in ut]), nullable=False)
 
   __mapper_args__ = {
     "polymorphic_identity": UserType.User,
-    "polymorphic_on": type
+    "polymorphic_on": type  # Separate the different sub-models on the "type" column
   }
 
   def __str__(self):
@@ -44,28 +49,24 @@ class Participant(User):
 
   __tablename__ = "participant"
   id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+  email_address = Column(String(128), nullable=False)
   questions = relationship("Question", back_populates="participant")
 
   __mapper_args__ = {
-    "polymorphic_identity": UserType.Participant
+    "polymorphic_identity": UserType.Participant  # This model's "type" is "participant"
   }
-
-  def __str__(self):
-    return f"{super().__str__()}{self.username} asked {'. '.join([question.content for question in self.questions])}"
 
 
 class Host(User):
   """Another sub-type of user"""
   __tablename__ = "host"
   id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+  website = Column(String(128), nullable=False)
   answers = relationship("Answer", back_populates="host")
 
   __mapper_args__ = {
-    "polymorphic_identity": UserType.Host
+    "polymorphic_identity": UserType.Host  # This model's "type" is "host"
   }
-
-  def __str__(self):
-    return f"{super().__str__()}{self.username} answered {'. '.join([answer.content for answer in self.answers])}"
 
 
 class Question(Base):
@@ -95,16 +96,16 @@ if __name__ == "__main__":
   Base.metadata.create_all(engine)
 
   q1 = Question(content="What is blue?")
-  p1 = Participant(username="Peter", questions=[q1])
+  p1 = Participant(username="Peter", questions=[q1], email_address="peter@foo.bar")
 
   q2 = Question(content="What is red?")
-  p2 = Participant(username="Paul", questions=[q2])
+  p2 = Participant(username="Paul", questions=[q2], email_address="paul@foo.bar")
   
   a1 = Answer(question=q1, content="A blue cat")
-  h1 = Host(username="Henry", answers=[a1])
+  h1 = Host(username="Henry", answers=[a1], website="https://henry.foo.bar")
   
   a2 = Answer(question=q2, content="A red cat")
-  h2 = Host(username="Harold", answers=[a2])
+  h2 = Host(username="Harold", answers=[a2], website="https://harold.foo.bar")
 
   session.add_all([p1, p2, h1, h2])
   session.commit()
@@ -119,7 +120,14 @@ if __name__ == "__main__":
   print("All participants:")
   all_participants = session.query(Participant).all()
   for participant in all_participants:
-    print(participant.username)
+    print(f"{participant.username}, {participant.email_address}")
+
+  print()
+
+  print("All hosts:")
+  all_hosts = session.query(Host).all()
+  for host in all_hosts:
+    print(f"{host.username}, {host.website}")
 
   print()
 
